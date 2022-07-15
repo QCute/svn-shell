@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+script=$(dirname "$0")
+
+function base() {
+    valgrind --leak-check=full "${script}/../svn-shell-debug"
+}
+
+function with_shell_commands_dir() {
+    mkdir -p ~/svn-shell-commands
+    valgrind --leak-check=full "${script}/../svn-shell-debug"
+}
+
+function with_shell_commands() {
+    cat > ~/svn-shell-commands/no-interactive-login << EOF
+#!/usr/bin/env bash
+printf '%s\n' "Hi \${USER}! You've successfully authenticated, but I does not provide shell access."
+exit 128
+EOF
+    valgrind --leak-check=full "${script}/../svn-shell-debug"
+}
+
+function with_base_args() {
+    valgrind --leak-check=full "${script}/../svn-shell-debug" -c "svnserve -t"
+}
+
+function with_root_args() {
+    valgrind --leak-check=full "${script}/../svn-shell-debug" -c "svnserve -t -r /home/svn"
+}
+
+function with_default_option() {
+    mkdir -p /etc/default/
+    cat > /etc/default/svnserve << EOF
+# tunnel username
+--tunnel-user=${USER}
+EOF
+    valgrind --leak-check=full "${script}/../svn-shell-debug"
+}
+
+if [[ -z $(type valgrind 2>/dev/null) ]];then
+    echo "valgrind not found"
+    exit 1
+elif [[ -z $(type svnserve 2>/dev/null) ]];then
+    echo "svnserve not found"
+    exit 1
+fi
+
+base
+with_shell_commands_dir
+with_shell_commands
+with_base_args
+with_root_args
+with_default_option
